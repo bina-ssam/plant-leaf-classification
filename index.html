@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>식물의 잎 분류하기</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (주아 및 나눔고딕체) -->
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Confetti 효과 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+        }
+        .font-jua {
+            font-family: 'Jua', sans-serif;
+        }
+        /* 드래그 중인 카드 스타일 */
+        .dragging {
+            opacity: 0.3;
+            transform: scale(0.9) rotate(-3deg);
+        }
+        /* 드롭 가능 영역 호버 효과 */
+        .drag-over {
+            background-color: rgba(16, 185, 129, 0.08);
+            border-color: #10b981 !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col selection:bg-emerald-100">
+
+    <!-- 상단 심플 교사용 헤더 -->
+    <header class="bg-white border-b-4 border-emerald-400 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-6 py-3.5 flex flex-col md:flex-row items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <span class="text-3xl">🌱</span>
+                <div>
+                    <h1 class="text-2xl font-jua text-emerald-600 tracking-wide">식물의 잎 분류하기</h1>
+                    <p class="text-xs text-slate-400 font-bold">초등학교 3학년 과학 - 4. 식물의 생활</p>
+                </div>
+            </div>
+
+            <!-- 조작 도구 모음 버튼 (분류 결과만 새로고침 / 판서 전체 새로고침) -->
+            <div class="flex items-center space-x-3">
+                <!-- 추가한 식물은 보존하고 분류만 회수하는 버튼 -->
+                <button onclick="recallClassifiedPlants()"
+                    class="flex items-center space-x-1.5 px-4 py-2.5 bg-emerald-100 hover:bg-emerald-500 text-emerald-700 hover:text-white text-sm font-bold rounded-full transition-all active:scale-95 hover:scale-105 cursor-pointer shadow-sm">
+                    <i data-lucide="undo-2" class="w-4 h-4 pointer-events-none"></i>
+                    <span class="pointer-events-none">분류 결과 새로고침</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 레이아웃 컨테이너 -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+        <!-- [좌측 사이드바: 대기 식물 & 추가] (lg:col-span-4) -->
+        <section class="lg:col-span-4 flex flex-col gap-4">
+
+            <!-- 대기 식물 목록 (정사각형 자석 타일형) -->
+            <div class="bg-white p-4 rounded-3xl border-2 border-emerald-100 flex flex-col min-h-[460px] shadow-sm">
+                <div class="border-b border-slate-100 pb-2 mb-3">
+                    <h3 class="font-jua text-base text-slate-700 flex items-center space-x-1.5">
+                        <span>🌿 분류할 식물 이름</span>
+                    </h3>
+                    <p class="text-[10px] text-slate-400 font-bold mt-0.5">아래 카드를 잡고 오른쪽 질문 칸에 맞춰 분리해 주세요.</p>
+                </div>
+
+                <!-- 자석 바둑판 배열 (grid-cols-2) -->
+                <div id="unclassified-list" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event, 'unclassified')"
+                    class="flex-grow grid grid-cols-2 gap-3 p-2.5 bg-slate-50 border border-dashed border-slate-200 rounded-2xl min-h-[350px] align-content-start overflow-y-auto">
+                    <!-- JS 동적 렌더링 -->
+                </div>
+            </div>
+
+        </section>
+
+        <!-- [우측 영역: 탐구 질문 & 분류 구역] (lg:col-span-8) -->
+        <div class="lg:col-span-8 flex flex-col gap-5">
+
+            <!-- [우측 상단: 분류 기준 설정 및 거대 전광판] -->
+            <div class="bg-amber-50 border-4 border-amber-200 rounded-3xl p-5 shadow-sm space-y-4">
+
+                <div class="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl">📋</span>
+                        <h2 class="font-jua text-base text-amber-950">분류할 질문을 고르거나 적으세요</h2>
+                    </div>
+                    <span class="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold">실시간 자동 적용</span>
+                </div>
+
+                <!-- 추천 질문 단추 세트 -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button onclick="setCriterion('잎이 좁고 길쭉한가?')" class="crit-btn py-2.5 px-2.5 bg-white hover:bg-amber-100 border border-amber-300 rounded-xl font-bold text-amber-950 text-xs transition-all text-center truncate shadow-sm cursor-pointer hover:scale-105"></button>
+                    <button onclick="setCriterion('가장자리가 톱니 모양인가?')" class="crit-btn py-2.5 px-2.5 bg-white hover:bg-amber-100 border border-amber-300 rounded-xl font-bold text-amber-950 text-xs transition-all text-center truncate shadow-sm cursor-pointer hover:scale-105"></button>
+                    <button onclick="setCriterion('잎의 끝이 뾰족한가?')" class="crit-btn py-2.5 px-2.5 bg-white hover:bg-amber-100 border border-amber-300 rounded-xl font-bold text-amber-950 text-xs transition-all text-center truncate shadow-sm cursor-pointer hover:scale-105"></button>
+                    <button onclick="setCriterion('잎자루에 잎이 여러 장인가?')" class="crit-btn py-2.5 px-2.5 bg-white hover:bg-amber-100 border border-amber-300 rounded-xl font-bold text-amber-950 text-xs transition-all text-center truncate shadow-sm cursor-pointer hover:scale-105"></button>
+                </div>
+
+                <!-- 자유 타이핑 입력란 (입력하는 즉시 실시간 아래 전광판에 반영됨) -->
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-amber-500">
+                        <i data-lucide="pencil-line" class="w-4 h-4"></i>
+                    </div>
+                    <input type="text" id="custom-crit-input" oninput="handleCritLiveInput()" placeholder="새로운 분류 질문을 직접 입력해보세요..."
+                        class="w-full pl-10 pr-4 py-2 border-2 border-amber-300 focus:border-amber-500 focus:outline-none rounded-2xl text-xs sm:text-sm font-bold bg-white text-amber-950 placeholder:text-amber-300/80 shadow-inner">
+                </div>
+
+                <!-- 왕글씨 메인 질문 전광판 (선생님과 학생들이 한눈에 읽는 메인 영역) -->
+                <div class="bg-gradient-to-r from-amber-400 to-amber-300 rounded-2xl p-4 border-2 border-amber-500 text-center shadow-md relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-white/20"></div>
+                    <span class="text-[10px] uppercase tracking-wider font-bold text-amber-900/60 block mb-1">나의 분류 탐구 기준</span>
+                    <span id="active-criterion-text" class="font-jua text-xl sm:text-2xl md:text-3xl text-amber-950 drop-shadow-sm leading-tight">잎이 좁고 길쭉한가?</span>
+                </div>
+            </div>
+
+            <!-- [우측 하단: 두 갈래 분류 정리판] -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <!-- '그렇다' 영역 -->
+                <div id="zone-yes" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event, 'yes')"
+                    class="drop-zone bg-sky-50/70 border-4 border-dashed border-sky-300 hover:border-sky-500 rounded-3xl p-5 transition-all flex flex-col items-center min-h-[380px] shadow-sm">
+                    <div class="text-center pb-3 border-b-2 border-sky-200 w-full mb-4">
+                        <span class="text-4xl">⭕</span>
+                        <h3 class="font-jua text-xl text-sky-800 mt-1">그렇다</h3>
+                    </div>
+                    <!-- 카드가 모이는 공간 -->
+                    <div id="list-yes" class="w-full grid grid-cols-2 gap-3">
+                        <!-- JS 렌더링 -->
+                    </div>
+                </div>
+
+                <!-- '그렇지 않다' 영역 -->
+                <div id="zone-no" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event, 'no')"
+                    class="drop-zone bg-orange-50/70 border-4 border-dashed border-orange-300 hover:border-orange-500 rounded-3xl p-5 transition-all flex flex-col items-center min-h-[380px] shadow-sm">
+                    <div class="text-center pb-3 border-b-2 border-orange-200 w-full mb-4">
+                        <span class="text-4xl">❌</span>
+                        <h3 class="font-jua text-xl text-orange-800 mt-1">그렇지 않다</h3>
+                    </div>
+                    <!-- 카드가 모이는 공간 -->
+                    <div id="list-no" class="w-full grid grid-cols-2 gap-3">
+                        <!-- JS 렌더링 -->
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- 자체 경보 안내 모달 (모달 팝업) -->
+    <div id="alert-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border-4 border-emerald-100 text-center space-y-4">
+            <div class="text-4xl" id="alert-icon">💡</div>
+            <h3 class="font-jua text-lg text-slate-800" id="alert-title">안내</h3>
+            <p class="text-xs text-slate-500 font-bold leading-relaxed" id="alert-message">메시지 내용</p>
+            <button onclick="closeAlertModal()" class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-jua rounded-xl text-sm transition-all shadow-md cursor-pointer">
+                확인
+            </button>
+        </div>
+    </div>
+
+    <!-- 하단 크레딧 -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-6 text-center text-xs text-slate-400 font-bold">
+            <p>© 초등학교 3학년 과학 - 4. 식물의 생활 (디지털 분류 도구)</p>
+        </div>
+    </footer>
+
+    <script>
+        // ----------------- [1] 기본 수록 6종 식물 목록 정의 -----------------
+        // image 경로는 images/ 폴더의 잎 카드 사진을 가리킵니다.
+        const defaultPlants = [
+            { name: "벚나무", image: "images/cherry.jpg" },
+            { name: "은행나무", image: "images/ginkgo.jpg" },
+            { name: "강아지풀", image: "images/foxtail.jpg" },
+            { name: "소나무", image: "images/pine.jpg" },
+            { name: "토끼풀", image: "images/clover.jpg" },
+            { name: "단풍나무", image: "images/maple.jpg" }
+        ];
+
+        // ----------------- [2] 상태 관리 변수 -----------------
+        let selectedCriterion = "잎이 좁고 길쭉한가?"; // 기본 분류 질문
+        let plantList = []; // 식물 목록 데이터 배열 ({ id, name, image, status: 'unclassified' | 'yes' | 'no' })
+
+        // ----------------- [3] 사운드 이펙트 모듈 (Web Audio API) -----------------
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'click') {
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                } else if (type === 'drop') {
+                    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(987.77, audioCtx.currentTime + 0.12);
+                    gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.12);
+                } else if (type === 'success') {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const subOsc = audioCtx.createOscillator();
+                        const subGain = audioCtx.createGain();
+                        subOsc.connect(subGain);
+                        subGain.connect(audioCtx.destination);
+                        subOsc.frequency.setValueAtTime(freq, audioCtx.currentTime + (idx * 0.08));
+                        subGain.gain.setValueAtTime(0.04, audioCtx.currentTime + (idx * 0.08));
+                        subGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + (idx * 0.08) + 0.2);
+                        subOsc.start(audioCtx.currentTime + (idx * 0.08));
+                        subOsc.stop(audioCtx.currentTime + (idx * 0.08) + 0.2);
+                    });
+                }
+            } catch (e) {
+                // 음향 차단 예방
+            }
+        }
+
+        // ----------------- [4] 초기 페이지 기동 및 로컬스토리지 백업 복구 -----------------
+        window.onload = function() {
+            lucide.createIcons();
+
+            const savedCriterion = localStorage.getItem("s_leaf_criterion");
+            // 버전3 키를 사용하여 기존의 깨진 이미지 캐시를 무시하고 새로 불러옵니다.
+            const savedPlants = localStorage.getItem("s_leaf_plants_v3");
+
+            if (savedCriterion) {
+                selectedCriterion = savedCriterion;
+            }
+            document.getElementById("active-criterion-text").innerText = selectedCriterion;
+
+            if (savedPlants) {
+                try {
+                    plantList = JSON.parse(savedPlants);
+                    if(plantList.length > 0 && typeof plantList[0] === 'string') {
+                        resetToDefaultPlants();
+                    } else if (plantList.length > 0 && typeof plantList[0].image === 'undefined') {
+                        resetToDefaultPlants();
+                    }
+                } catch(e) {
+                    resetToDefaultPlants();
+                }
+            } else {
+                resetToDefaultPlants();
+            }
+
+            renderAllBoards();
+            updateCriterionButtonStyles();
+        };
+
+        // 기본 리스트 복원
+        function resetToDefaultPlants() {
+            plantList = defaultPlants.map((plant, index) => ({
+                id: `plant-${Date.now()}-${index}`,
+                name: plant.name,
+                image: plant.image,
+                status: 'unclassified'
+            }));
+            saveToStorage();
+        }
+
+        // 로컬스토리지에 식물 상태 저장
+        function saveToStorage() {
+            localStorage.setItem("s_leaf_criterion", selectedCriterion);
+            localStorage.setItem("s_leaf_plants_v3", JSON.stringify(plantList));
+        }
+
+        // ----------------- [5] 분류 기준 설정 핸들러 -----------------
+        function setCriterion(text) {
+            playSound('click');
+            selectedCriterion = text;
+            document.getElementById("active-criterion-text").innerText = text;
+
+            // 직접 입력 상자도 같이 일체화
+            document.getElementById("custom-crit-input").value = text;
+
+            saveToStorage();
+            updateCriterionButtonStyles();
+        }
+
+        // 실시간 입력 갱신 기능 (추가 적용 단추 클릭 없이 바로 왕글씨 반영)
+        function handleCritLiveInput() {
+            const inputVal = document.getElementById("custom-crit-input").value;
+            // 빈 칸이 아니면 실시간으로 전광판 글씨 갱신
+            if (inputVal.trim() !== "") {
+                selectedCriterion = inputVal;
+                document.getElementById("active-criterion-text").innerText = inputVal;
+                saveToStorage();
+                updateCriterionButtonStyles();
+            }
+        }
+
+        // 선택된 고정 버튼 전용 시각 활성화 피드백
+        function updateCriterionButtonStyles() {
+            const buttons = document.querySelectorAll(".crit-btn");
+            const fixedTexts = [
+                '잎이 좁고 길쭉한가?',
+                '가장자리가 톱니 모양인가?',
+                '잎의 끝이 뾰족한가?',
+                '잎자루에 잎이 여러 장인가?'
+            ];
+
+            buttons.forEach((btn, index) => {
+                const targetText = fixedTexts[index];
+                btn.innerText = targetText;
+
+                if (selectedCriterion === targetText) {
+                    btn.className = "crit-btn py-2.5 px-2.5 bg-emerald-500 hover:bg-emerald-600 border border-emerald-600 rounded-xl font-bold text-white text-xs transition-all text-center truncate shadow-md scale-[1.03] cursor-pointer";
+                } else {
+                    btn.className = "crit-btn py-2.5 px-2.5 bg-white hover:bg-amber-100 border border-amber-300 rounded-xl font-bold text-amber-950 text-xs transition-all text-center truncate shadow-sm cursor-pointer";
+                }
+            });
+        }
+
+        // ----------------- [6] 드래그 앤 드롭 로직 -----------------
+        let draggedPlantId = null;
+
+        function dragStart(e, id) {
+            draggedPlantId = id;
+            e.dataTransfer.setData("text/plain", id);
+
+            setTimeout(() => {
+                const element = document.getElementById(id);
+                if (element) element.classList.add("dragging");
+            }, 0);
+        }
+
+        function dragEnd(e, id) {
+            const element = document.getElementById(id);
+            if (element) element.classList.remove("dragging");
+            draggedPlantId = null;
+        }
+
+        // 특정 식물들만 '대기열'로 신속하게 회수하는 기능 (식물 리스트 보존 및 분류 결과만 새로고침)
+        function recallClassifiedPlants() {
+            playSound('click');
+            plantList.forEach(p => {
+                p.status = 'unclassified';
+            });
+            saveToStorage();
+            renderAllBoards();
+            showAlertModal("분류 결과 새로고침 완료!", "추가한 식물들은 유지한 채 분류 결과만 대기 칸으로 돌려보냈습니다. ♻️", "📥");
+        }
+
+        function allowDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add("drag-over");
+        }
+
+        function dragLeave(e) {
+            e.currentTarget.classList.remove("drag-over");
+        }
+
+        function handleDrop(e, status) {
+            e.preventDefault();
+            e.currentTarget.classList.remove("drag-over");
+
+            const id = e.dataTransfer.getData("text/plain") || draggedPlantId;
+            if (id) {
+                movePlantStatus(id, status);
+            }
+        }
+
+        // 상태값 분류 업데이트
+        function movePlantStatus(id, targetStatus) {
+            const plant = plantList.find(p => p.id === id);
+            if (plant) {
+                const oldStatus = plant.status;
+                plant.status = targetStatus;
+
+                playSound('drop');
+                saveToStorage();
+                renderAllBoards();
+
+                // 대기 구역이 완전히 텅 비었을 때 폭죽 연출
+                checkFinishCongrats(oldStatus, targetStatus);
+            }
+        }
+
+        function checkFinishCongrats(oldStatus, targetStatus) {
+            const unclassifiedCount = plantList.filter(p => p.status === 'unclassified').length;
+            if (unclassifiedCount === 0 && oldStatus === 'unclassified' && (targetStatus === 'yes' || targetStatus === 'no')) {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.65 }
+                });
+                playSound('success');
+            }
+        }
+
+        // ----------------- [7] 보드 동적 화면 렌더링 -----------------
+        function renderAllBoards() {
+            const unclassifiedContainer = document.getElementById("unclassified-list");
+            const yesContainer = document.getElementById("list-yes");
+            const noContainer = document.getElementById("list-no");
+
+            unclassifiedContainer.innerHTML = "";
+            yesContainer.innerHTML = "";
+            noContainer.innerHTML = "";
+
+            let unclassifiedHtml = "";
+            let yesHtml = "";
+            let noHtml = "";
+
+            plantList.forEach(plant => {
+                if (plant.status === 'unclassified') {
+                    unclassifiedHtml += createPlantBadgeHTML(plant);
+                } else if (plant.status === 'yes') {
+                    yesHtml += createClassifiedBadgeHTML(plant, 'yes');
+                } else if (plant.status === 'no') {
+                    noHtml += createClassifiedBadgeHTML(plant, 'no');
+                }
+            });
+
+            // 대기 보드
+            unclassifiedContainer.innerHTML = unclassifiedHtml || `
+                <div class="col-span-2 h-full flex flex-col items-center justify-center text-center py-12">
+                    <span class="text-3xl mb-1.5 pointer-events-none">👏</span>
+                    <span class="text-[11px] font-bold text-slate-400 pointer-events-none">모두 분류했습니다!</span>
+                </div>
+            `;
+
+            // 그렇다 결과 구역
+            yesContainer.innerHTML = yesHtml || `
+                <div class="col-span-2 py-10 border-2 border-dashed border-sky-100 rounded-2xl flex flex-col items-center justify-center text-slate-300">
+                    <span class="text-xl mb-1 pointer-events-none">⭕</span>
+                    <span class="text-[10px] font-bold pointer-events-none">대기 중</span>
+                </div>
+            `;
+
+            // 그렇지 않다 결과 구역
+            noContainer.innerHTML = noHtml || `
+                <div class="col-span-2 py-10 border-2 border-dashed border-orange-100 rounded-2xl flex flex-col items-center justify-center text-slate-300">
+                    <span class="text-xl mb-1 pointer-events-none">❌</span>
+                    <span class="text-[10px] font-bold pointer-events-none">대기 중</span>
+                </div>
+            `;
+
+            lucide.createIcons();
+        }
+
+        // [정사각형 자석 타일형] 대기열 배지 생성 (글자 크기를 키우고 여백을 타이트하게 개선)
+        function createPlantBadgeHTML(plant) {
+            return `
+                <div id="${plant.id}" draggable="true" ondragstart="dragStart(event, '${plant.id}')" ondragend="dragEnd(event, '${plant.id}')"
+                    class="aspect-square bg-white text-slate-800 p-2 border-b-4 border-emerald-300 active:border-b-0 rounded-2xl shadow-md flex flex-col justify-between cursor-grab transition-all active:scale-95 hover:scale-105 select-none animate-[scaleIn_0.15s_ease-out] relative">
+
+                    <!-- 식물 사진 영역 -->
+                    <div class="flex-grow flex items-center justify-center overflow-hidden rounded-xl bg-slate-50 mb-1 relative border border-slate-100 pointer-events-none mt-1">
+                        <img src="${plant.image}" alt="${plant.name}" class="w-full h-full object-cover bg-white" onerror="this.onerror=null; this.src='https://placehold.co/150x150/e2e8f0/475569?text='+encodeURIComponent('${plant.name}');">
+                    </div>
+
+                    <!-- 식물명 -->
+                    <div class="text-center font-jua text-lg sm:text-xl leading-none tracking-wide w-full px-1 pointer-events-none text-emerald-950 pb-0.5">
+                        ${plant.name}
+                    </div>
+                </div>
+            `;
+        }
+
+        // [드롭 후 결과 타일] (글자 크기를 크게 개편하고 복구 수납형 컴팩트 레이아웃)
+        function createClassifiedBadgeHTML(plant, currentZone) {
+            const zoneBorderColor = currentZone === 'yes' ? 'border-sky-300 hover:border-sky-500' : 'border-orange-300 hover:border-orange-500';
+            const zoneTextBg = currentZone === 'yes' ? 'bg-sky-100 text-sky-800' : 'bg-orange-100 text-orange-800';
+
+            return `
+                <div id="${plant.id}" draggable="true" ondragstart="dragStart(event, '${plant.id}')" ondragend="dragEnd(event, '${plant.id}')"
+                    class="aspect-square bg-white border-2 ${zoneBorderColor} rounded-2xl shadow-sm p-1.5 flex flex-col justify-between cursor-grab transition-all hover:scale-105 active:scale-95 animate-[scaleIn_0.15s_ease-out] select-none">
+
+                    <!-- 되돌리기 버튼 -->
+                    <div class="w-full flex justify-between items-center z-10 mb-1">
+                        <span class="text-[10px] font-bold ${zoneTextBg} px-1.5 py-0.5 rounded-md scale-95 pointer-events-none">${currentZone === 'yes' ? '그렇다' : '아님'}</span>
+                        <button onclick="movePlantStatus('${plant.id}', 'unclassified')" title="대기열로 복원" class="p-1 hover:bg-slate-100 text-slate-500 rounded-md border border-slate-200 cursor-pointer bg-white">
+                            <i data-lucide="undo-2" class="w-3.5 h-3.5 pointer-events-none"></i>
+                        </button>
+                    </div>
+
+                    <!-- 식물 사진 영역 -->
+                    <div class="flex-grow flex items-center justify-center overflow-hidden rounded-xl bg-slate-50 mb-1 relative pointer-events-none">
+                        <img src="${plant.image}" alt="${plant.name}" class="w-full h-full object-cover bg-white" onerror="this.onerror=null; this.src='https://placehold.co/150x150/e2e8f0/475569?text='+encodeURIComponent('${plant.name}');">
+                    </div>
+
+                    <!-- 식물 이름 -->
+                    <div class="text-center font-jua text-slate-800 text-base sm:text-lg flex items-center justify-center truncate w-full px-1 leading-none pointer-events-none mb-1">
+                        ${plant.name}
+                    </div>
+
+                    <!-- 하단 반대 영역 스위칭 신속 버튼 -->
+                    <div class="w-full">
+                        ${currentZone === 'yes' ?
+                            `<button onclick="movePlantStatus('${plant.id}', 'no')" class="w-full py-1 text-[9px] bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg border border-orange-200 font-bold transition-all cursor-pointer"><span class="pointer-events-none">❌ 아님 칸으로</span></button>` :
+                            `<button onclick="movePlantStatus('${plant.id}', 'yes')" class="w-full py-1 text-[9px] bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-lg border border-sky-200 font-bold transition-all cursor-pointer"><span class="pointer-events-none">⭕ 그렇다 칸으로</span></button>`
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        // ----------------- [8] 안내 경보 모달 제어 -----------------
+        function showAlertModal(title, msg, icon = "💡") {
+            document.getElementById("alert-title").innerText = title;
+            document.getElementById("alert-message").innerText = msg;
+            document.getElementById("alert-icon").innerText = icon;
+            document.getElementById("alert-modal").classList.remove("hidden");
+        }
+
+        function closeAlertModal() {
+            playSound('click');
+            document.getElementById("alert-modal").classList.add("hidden");
+        }
+    </script>
+</body>
+</html>
