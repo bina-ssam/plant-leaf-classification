@@ -12,17 +12,17 @@
 
 ## 잎 카드 이미지
 
-`images/` 폴더에 아래 파일명으로 잎 카드 사진을 넣으면 카드에 표시됩니다.
+`images/` 폴더의 잎 카드 사진이 각 카드에 표시됩니다.
 파일이 없으면 식물 이름이 적힌 임시 이미지가 자동으로 표시됩니다.
 
 | 식물 | 파일명 |
 |------|--------|
-| 강아지풀 | `images/foxtail.jpg` |
-| 토끼풀 | `images/clover.jpg` |
-| 단풍나무 | `images/maple.jpg` |
-| 소나무 | `images/pine.jpg` |
-| 은행나무 | `images/ginkgo.jpg` |
-| 벚나무 | `images/cherry.jpg` *(나중에 추가 예정)* |
+| 강아지풀 | `images/foxtail.png` |
+| 토끼풀 | `images/clover.png` |
+| 단풍나무 | `images/maple.png` |
+| 소나무 | `images/pine.png` |
+| 은행나무 | `images/ginkgo.png` |
+| 벚나무 | `images/cherry.png` |
 
 ## 실행
 `index.html`을 브라우저로 열거나 GitHub Pages 주소로 접속하면 됩니다.
